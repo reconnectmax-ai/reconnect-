@@ -6,7 +6,7 @@
 <title>reconnect</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Inter:wght@400;500;600&family=Caveat:wght@600;700&display=swap" rel="stylesheet">
-<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 
 <style>
   /* ============================================================
@@ -228,7 +228,13 @@
 </div>
 
 <script>
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+document.getElementById('app').innerHTML = '<p class="state-msg">memuat…</p>';
+let supabase;
+try{
+  supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+}catch(e){
+  document.getElementById('app').innerHTML = '<p class="state-msg">Gagal load Supabase: ' + e.message + '</p>';
+}
 
 // Ambil username dari path (reconnect.com/namauser) dengan fallback ?u= untuk testing/preview
 function getUsername(){
@@ -249,28 +255,32 @@ function el(tag, cls, html){
 }
 
 async function load(){
-  const username = getUsername();
-  const { data: profile, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('username', username)
-    .maybeSingle();
+  try{
+    const username = getUsername();
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('username', username)
+      .maybeSingle();
 
-  if(error || !profile){
-    document.getElementById('app').innerHTML =
-      `<p class="state-msg">Profile "reconnect.com/${username}" belum ada.</p>`;
-    return;
+    if(error || !profile){
+      document.getElementById('app').innerHTML =
+        `<p class="state-msg">Profile "reconnect.com/${username}" belum ada.</p>`;
+      return;
+    }
+    currentProfile = profile;
+
+    const { data: memberRows } = await supabase
+      .from('group_members')
+      .select('group_id, groups(*)')
+      .eq('profile_id', profile.id);
+
+    currentGroups = (memberRows || []).map(r => r.groups).filter(Boolean);
+
+    renderProfile(username);
+  }catch(e){
+    document.getElementById('app').innerHTML = '<p class="state-msg">Error: ' + e.message + '</p>';
   }
-  currentProfile = profile;
-
-  const { data: memberRows } = await supabase
-    .from('group_members')
-    .select('group_id, groups(*)')
-    .eq('profile_id', profile.id);
-
-  currentGroups = (memberRows || []).map(r => r.groups).filter(Boolean);
-
-  renderProfile(username);
 }
 
 function renderProfile(username){
