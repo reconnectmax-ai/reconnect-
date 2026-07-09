@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>reconnect · edit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+
+<script>
+  const SUPABASE_URL = "https://etzqepgmuhamqwnsdbnx.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_gERShmzbsCjVrr_3rpiGqg_epJ1QCAc";
+</script>
+
+<style>
+  :root{
+    --bg:#0A0A0C; --surface:#151417; --ink:#F4F2F7; --ink-soft:#9A94A6;
+    --coral:#FF6B54; --grape:#9E86FF; --line: rgba(244,242,247,0.09);
+  }
+  *{ box-sizing:border-box; }
+  body{
+    margin:0; font-family:'Inter', sans-serif; background:var(--bg); color:var(--ink);
+    min-height:100vh; display:flex; justify-content:center; padding:40px 16px;
+  }
+  .phone{ width:100%; max-width:420px; }
+  h1{ font-family:'Bricolage Grotesque', sans-serif; font-size:26px; margin:0 0 6px; }
+  p.sub{ color:var(--ink-soft); font-size:14px; margin:0 0 24px; }
+  label{ font-size:13px; color:var(--ink-soft); font-weight:600; display:block; margin:16px 0 6px; }
+  input, textarea{
+    width:100%; background:var(--surface); border:1px solid var(--line);
+    border-radius:12px; padding:12px 14px; color:var(--ink); font-family:inherit; font-size:14.5px;
+  }
+  textarea{ resize:vertical; min-height:70px; }
+  button{
+    width:100%; margin-top:20px; background:var(--grape); color:#0A0A0C; border:none;
+    border-radius:14px; padding:14px; font-weight:700; font-size:14.5px; cursor:pointer;
+  }
+  button.secondary{ background:transparent; border:1px solid var(--line); color:var(--ink-soft); margin-top:10px; }
+  .msg{ margin-top:14px; font-size:13.5px; color:var(--coral); }
+  .link-row{ display:flex; gap:8px; }
+  .link-row input{ flex:1; }
+  .remove-link{ background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:0 14px; color:var(--ink-soft); cursor:pointer; }
+</style>
+</head>
+<body>
+<div class="phone" id="app"></div>
+
+<script>
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const app = document.getElementById('app');
+
+async function init(){
+  const { data: { session } } = await supabase.auth.getSession();
+  if(session) renderEditor(session.user);
+  else renderLogin();
+}
+
+function renderLogin(){
+  app.innerHTML = `
+    <h1>Masuk</h1>
+    <p class="sub">Pakai email buat login & edit profile reconnect kamu sendiri.</p>
+    <label>Email</label>
+    <input type="email" id="emailInput" placeholder="kamu@email.com">
+    <button id="sendBtn">Kirim link login</button>
+    <p class="msg" id="msg"></p>
+  `;
+  document.getElementById('sendBtn').addEventListener('click', async ()=>{
+    const email = document.getElementById('emailInput').value.trim();
+    if(!email) return;
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: window.location.href }
+    });
+    document.getElementById('msg').textContent = error
+      ? 'Gagal kirim — coba lagi.'
+      : 'Cek email kamu, tap link-nya buat login.';
+  });
+}
+
+async function renderEditor(user){
+  let { data: profile } = await supabase
+    .from('profiles').select('*').eq('user_id', user.id).maybeSingle();
+
+  if(!profile){
+    profile = { username:'', name:'', bio:'', avatar_emoji:'🌱', links:[] };
+  }
+
+  app.innerHTML = `
+    <h1>Edit profile</h1>
+    <p class="sub">${user.email}</p>
+
+    <label>Username (jadi reconnect.com/username)</label>
+    <input id="username" value="${profile.username||''}" placeholder="namakamu">
+
+    <label>Nama</label>
+    <input id="name" value="${profile.name||''}" placeholder="Nama kamu">
+
+    <label>Emoji avatar</label>
+    <input id="emoji" value="${profile.avatar_emoji||'🌱'}" maxlength="2">
+
+    <label>Bio</label>
+    <textarea id="bio" placeholder="Cerita singkat tentang kamu">${profile.bio||''}</textarea>
+
+    <label>Links</label>
+    <div id="linksWrap"></div>
+    <button type="button" class="secondary" id="addLink">+ tambah link</button>
+
+    <button id="saveBtn">Simpan</button>
+    <button type="button" class="secondary" id="logoutBtn">Keluar</button>
+    <p class="msg" id="msg"></p>
+  `;
+
+  const linksWrap = document.getElementById('linksWrap');
+  let links = (profile.links && profile.links.length) ? [...profile.links] : [{label:'',href:'',icon:'🔗'}];
+
+  function renderLinks(){
+    linksWrap.innerHTML = '';
+    links.forEach((l, i)=>{
+      const row = document.createElement('div');
+      row.className = 'link-row';
+      row.style.marginBottom = '8px';
+      row.innerHTML = `
+        <input placeholder="Label (mis. Instagram)" value="${l.label||''}" data-i="${i}" data-f="label">
+        <input placeholder="https://..." value="${l.href||''}" data-i="${i}" data-f="href">
+        <button type="button" class="remove-link" data-remove="${i}">✕</button>
+      `;
+      linksWrap.appendChild(row);
+    });
+    linksWrap.querySelectorAll('input').forEach(inp=>{
+      inp.addEventListener('input', e=>{
+        const i = e.target.dataset.i, f = e.target.dataset.f;
+        links[i][f] = e.target.value;
+      });
+    });
+    linksWrap.querySelectorAll('[data-remove]').forEach(btn=>{
+      btn.addEventListener('click', e=>{
+        links.splice(Number(e.target.dataset.remove), 1);
+        renderLinks();
+      });
+    });
+  }
+  renderLinks();
+
+  document.getElementById('addLink').addEventListener('click', ()=>{
+    links.push({label:'',href:'',icon:'🔗'});
+    renderLinks();
+  });
+
+  document.getElementById('saveBtn').addEventListener('click', async ()=>{
+    const payload = {
+      user_id: user.id,
+      username: document.getElementById('username').value.trim(),
+      name: document.getElementById('name').value.trim(),
+      avatar_emoji: document.getElementById('emoji').value.trim() || '🌱',
+      bio: document.getElementById('bio').value.trim(),
+      links: links.filter(l=>l.label && l.href)
+    };
+    const { error } = await supabase.from('profiles').upsert(payload, { onConflict:'user_id' });
+    document.getElementById('msg').textContent = error
+      ? ('Gagal simpan: ' + error.message)
+      : 'Tersimpan ✓ — cek reconnect.com/' + payload.username;
+  });
+
+  document.getElementById('logoutBtn').addEventListener('click', async ()=>{
+    await supabase.auth.signOut();
+    location.reload();
+  });
+}
+
+init();
+</script>
+</body>
+</html>

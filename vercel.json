@@ -1,0 +1,6 @@
+{
+  "rewrites": [
+    { "source": "/edit", "destination": "/edit.html" },
+    { "source": "/:username", "destination": "/view.html" }
+  ]
+}
