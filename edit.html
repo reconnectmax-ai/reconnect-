@@ -6,7 +6,7 @@
 <title>reconnect · edit</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 
 <script>
   const SUPABASE_URL = "https://etzqepgmuhamqwnsdbnx.supabase.co";
@@ -47,13 +47,24 @@
 <div class="phone" id="app"></div>
 
 <script>
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const app = document.getElementById('app');
+app.innerHTML = '<p class="sub">memuat…</p>';
+
+let supabase;
+try{
+  supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+}catch(e){
+  app.innerHTML = '<p class="sub">Gagal load Supabase: ' + e.message + '</p>';
+}
 
 async function init(){
-  const { data: { session } } = await supabase.auth.getSession();
-  if(session) renderEditor(session.user);
-  else renderLogin();
+  try{
+    const { data: { session } } = await supabase.auth.getSession();
+    if(session) renderEditor(session.user);
+    else renderLogin();
+  }catch(e){
+    app.innerHTML = '<p class="sub">Error: ' + e.message + '</p>';
+  }
 }
 
 function renderLogin(){
